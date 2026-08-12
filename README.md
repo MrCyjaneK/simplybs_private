@@ -83,7 +83,39 @@ $ go run . -host armv7a-linux-androideabi -package tor -build
 
 ## Recommended / "official" cache settings
 
-
 ```bash
 SIMPLYBS_ENV_DIR=/opt/_
 ```
+
+## Build cache (GitHub Releases)
+
+Built package archives are content-addressed (`package-version-<8-char-hash>`).
+They can be shared via a rolling GitHub Release without downloading the whole
+cache on every run.
+
+Config:
+
+| Variable | Purpose |
+| --- | --- |
+| `SIMPLYBS_CACHE_TAG` | Release tag (default `v0-sbs-$USER-$GOOS-$GOARCH`) |
+| `SIMPLYBS_CACHE_REPO` | Optional `owner/repo` if the cache lives outside the current repo |
+| `SIMPLYBS_GH` | Optional path to `gh` |
+
+Pull only what the current package tree needs (by exact asset name):
+
+```bash
+export SIMPLYBS_CACHE_TAG=v0-sbs-$USER-$(go env GOOS)-$(go env GOARCH)
+go run . -host x86_64-linux-gnu -package zlib -cache-pull
+```
+
+Push only local artifacts that are not already on the release (a package rebuild
+with a new hash is a new asset name, so “changed” caches upload naturally):
+
+```bash
+go run . -cache-push                                          # all local built/
+go run . -host x86_64-linux-gnu -package zlib -cache-push     # that package tree only
+```
+
+When `SIMPLYBS_CACHE_TAG` is set, `-build` also auto-pulls missing artifacts for
+each package as `EnsureBuilt` runs — still one release asset list, then only the
+needed files — so a narrow build never downloads an unrelated 1000-file cache.

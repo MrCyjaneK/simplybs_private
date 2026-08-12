@@ -21,6 +21,12 @@ func (p *Package) EnsureBuilt(h *host.Host, buildDependencies bool) {
 	buildPath := p.GenerateBuildPath(h, "built") + ".info.txt"
 	info, err := os.ReadFile(buildPath)
 	if err != nil {
+		// Selective remote pull: only this package's assets (by short-hash name).
+		if TryPullPackageCache(p, h) {
+			info, err = os.ReadFile(buildPath)
+		}
+	}
+	if err != nil {
 		log.Printf("[%s][%s] No build cache found, building...", h.Triplet, p.Package)
 		p.BuildPackage(h, true)
 		return
