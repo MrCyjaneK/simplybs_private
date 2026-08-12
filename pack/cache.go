@@ -326,6 +326,78 @@ func CachePull(pkgs []*Package, h *host.Host) error {
 	return nil
 }
 
+// TryPushPackageCache uploads this package's built artifacts that are missing
+// from the release. No-op when cache is disabled or everything is already remote.
+func TryPushPackageCache(p *Package, h *host.Host) {
+	if !CacheEnabled() {
+		return
+	}
+	tag := CacheTag()
+	if err := ensureRelease(tag); err != nil {
+		log.Printf("[%s][%s] cache push: ensure release: %v", h.Triplet, p.Package, err)
+		return
+	}
+	assets, err := loadRemoteAssets(tag)
+	if err != nil {
+		log.Printf("[%s][%s] cache push: list assets: %v", h.Triplet, p.Package, err)
+		return
+	}
+	builtRoot := filepath.Join(host.DataDir(), "built")
+	var uploadPaths []string
+	var uploadNames []string
+	for _, rel := range p.BuiltRelPaths(h) {
+		name := AssetNameForRel(rel)
+		if assets[name] {
+			continue
+		}
+		abs := filepath.Join(builtRoot, filepath.FromSlash(rel))
+		if _, err := os.Stat(abs); err != nil {
+			continue
+		}
+		uploadPaths = append(uploadPaths, abs)
+		uploadNames = append(uploadNames, name)
+	}
+	if len(uploadPaths) == 0 {
+		return
+	}
+	if err := uploadAssets(tag, uploadPaths, uploadNames); err != nil {
+		log.Printf("[%s][%s] cache push failed: %v", h.Triplet, p.Package, err)
+		return
+	}
+	for _, name := range uploadNames {
+		assets[name] = true
+		log.Printf("[%s][%s] cache push: %s", h.Triplet, p.Package, name)
+	}
+}
+
+func uploadAssets(tag string, uploadPaths, uploadNames []string) error {
+	staging, err := os.MkdirTemp("", "simplybs-cache-upload-*")
+	if err != nil {
+		return err
+	}
+	defer os.RemoveAll(staging)
+
+	staged := make([]string, 0, len(uploadPaths))
+	for i, src := range uploadPaths {
+		dst := filepath.Join(staging, uploadNames[i])
+		if err := copyFile(src, dst); err != nil {
+			return err
+		}
+		staged = append(staged, dst)
+	}
+
+	log.Printf("cache push: uploading %d file(s) to %s...", len(staged), tag)
+	args := append([]string{"release", "upload", tag}, staged...)
+	cmd := ghCmd(args...)
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("cache: upload: %w", err)
+	}
+	log.Printf("cache push: uploaded=%d tag=%s", len(staged), tag)
+	return nil
+}
+
 // CachePush uploads local built artifacts that are not yet on the release.
 // When pkgs is non-empty, only artifacts for those packages (and their deps)
 // on host h are considered; otherwise every file under DataDir()/built is.
@@ -393,30 +465,11 @@ func CachePush(pkgs []*Package, h *host.Host) error {
 		return nil
 	}
 
-	staging, err := os.MkdirTemp("", "simplybs-cache-upload-*")
-	if err != nil {
+	if err := uploadAssets(tag, uploadPaths, uploadNames); err != nil {
 		return err
 	}
-	defer os.RemoveAll(staging)
-
-	staged := make([]string, 0, len(uploadPaths))
-	for i, src := range uploadPaths {
-		dst := filepath.Join(staging, uploadNames[i])
-		if err := copyFile(src, dst); err != nil {
-			return err
-		}
-		staged = append(staged, dst)
-		log.Printf("cache: stage %s", uploadNames[i])
+	for _, name := range uploadNames {
+		assets[name] = true
 	}
-
-	log.Printf("cache push: uploading %d file(s) to %s...", len(staged), tag)
-	args := append([]string{"release", "upload", tag}, staged...)
-	cmd := ghCmd(args...)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("cache: upload: %w", err)
-	}
-	log.Printf("cache push: uploaded=%d tag=%s", len(staged), tag)
 	return nil
 }

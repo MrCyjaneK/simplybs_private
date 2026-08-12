@@ -69,14 +69,13 @@ and `/etc/profile.d/simplybs-cache.sh`), so every command sees them:
 
 GitHub Release cache for built archives (see README). Requires both
 `SIMPLYBS_CACHE_TAG` and `SIMPLYBS_CACHE_REPO`; when set, cache is enabled and
-`-build` auto-pulls. Selective pull uses package short-hash asset names so only
-the current `-package` / `-host` tree is fetched:
+`-build` auto-pulls needed artifacts and auto-pushes new/changed ones.
 
 ```bash
 export SIMPLYBS_CACHE_TAG=v0-sbs-$USER-$(go env GOOS)-$(go env GOARCH)
 export SIMPLYBS_CACHE_REPO=owner/repo
-go run . -host x86_64-linux-gnu -package zlib -cache-pull
-go run . -host x86_64-linux-gnu -package zlib -build
+go run . -host x86_64-linux-gnu -package zlib -build          # auto pull + push
+go run . -host x86_64-linux-gnu -package zlib -cache-pull     # explicit
 go run . -host x86_64-linux-gnu -package zlib -cache-push
 ```
 >>>>>>> 2773f51 (Add selective GitHub Release build cache pull/push)

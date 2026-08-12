@@ -293,6 +293,7 @@ func (p *Package) buildPackageInternal(h *host.Host, buildDependencies bool) {
 	}
 
 	log.Printf("Package built successfully: %s", builtArchivePath)
+	TryPushPackageCache(p, h)
 }
 
 func writeDotEnv(path string, env []string) {

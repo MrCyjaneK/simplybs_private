@@ -106,8 +106,16 @@ export SIMPLYBS_CACHE_TAG=v0-sbs-$USER-$(go env GOOS)-$(go env GOARCH)
 export SIMPLYBS_CACHE_REPO=owner/repo
 ```
 
-With those set, `-build` auto-pulls missing artifacts during `EnsureBuilt`
-(one release asset list, then only needed files). Explicit pull/push:
+With those set, `-build` auto-pulls the needed package tree up front, pulls
+per-package inside `EnsureBuilt` as a fallback, pushes each package after a
+successful local build, and runs a final tree push for anything still missing
+on the release:
+
+```bash
+go run . -host x86_64-linux-gnu -package zlib -build
+```
+
+Explicit pull/push still work:
 
 ```bash
 go run . -host x86_64-linux-gnu -package zlib -cache-pull

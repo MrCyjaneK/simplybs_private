@@ -290,6 +290,108 @@ esac
 	}
 }
 
+func TestTryPushPackageCacheUploadsOnlyMissing(t *testing.T) {
+	chdirRepoRoot(t)
+	dataDir := t.TempDir()
+	t.Setenv("SIMPLYBS_DATA_DIR", dataDir)
+	t.Setenv("SIMPLYBS_CACHE_TAG", "v0-sbs-test-linux-amd64")
+	t.Setenv("SIMPLYBS_CACHE_REPO", "owner/simplybs-cache")
+
+	pkg, err := FindPackage("native/zlib")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := host.SupportedHosts["x86_64-linux-gnu"]
+	rels := pkg.BuiltRelPaths(h)
+	builtRoot := filepath.Join(host.DataDir(), "built")
+	for _, rel := range rels {
+		path := filepath.Join(builtRoot, filepath.FromSlash(rel))
+		if err := os.MkdirAll(filepath.Dir(path), 0755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte("payload-"+rel), 0644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// Remote already has the .info.txt; the two archives should upload.
+	already := AssetNameForRel(rels[0])
+	assetsPath := filepath.Join(t.TempDir(), "assets.json")
+	if err := os.WriteFile(assetsPath, []byte(`{"assets":[{"name":"`+already+`"}]}`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	logPath := filepath.Join(t.TempDir(), "gh.log")
+	fakeGh := filepath.Join(t.TempDir(), "gh")
+	script := `#!/bin/bash
+set -euo pipefail
+echo "$*" >> "$FAKE_GH_LOG"
+cmd=$1; shift
+case "$cmd" in
+  -R) shift; cmd=$1; shift ;;
+esac
+case "$cmd" in
+  release)
+    sub=$1; shift
+    case "$sub" in
+      view) cat "$FAKE_GH_ASSETS" ;;
+      create) echo CREATE >> "$FAKE_GH_LOG" ;;
+      upload)
+        echo "UPLOAD $*" >> "$FAKE_GH_LOG"
+        ;;
+      *) echo "bad sub $sub" >&2; exit 1 ;;
+    esac
+    ;;
+  *) echo "bad $cmd" >&2; exit 1 ;;
+esac
+`
+	if err := os.WriteFile(fakeGh, []byte(script), 0755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("SIMPLYBS_GH", fakeGh)
+	t.Setenv("FAKE_GH_LOG", logPath)
+	t.Setenv("FAKE_GH_ASSETS", assetsPath)
+
+	resetRemoteAssetsCache()
+	TryPushPackageCache(pkg, h)
+
+	logData, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	logStr := string(logData)
+	if !strings.Contains(logStr, "UPLOAD ") {
+		t.Fatalf("expected upload, log=%s", logStr)
+	}
+	if strings.Contains(logStr, already) {
+		t.Fatalf("should not re-upload existing asset %s; log=%s", already, logStr)
+	}
+	wantTar := AssetNameForRel(rels[1])
+	wantNative := AssetNameForRel(rels[2])
+	if !strings.Contains(logStr, wantTar) || !strings.Contains(logStr, wantNative) {
+		t.Fatalf("expected upload of %s and %s; log=%s", wantTar, wantNative, logStr)
+	}
+
+	// Second push should upload nothing.
+	if err := os.WriteFile(logPath, nil, 0644); err != nil {
+		t.Fatal(err)
+	}
+	TryPushPackageCache(pkg, h)
+	logData, err = os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(string(logData), "UPLOAD ") {
+		t.Fatalf("second push should be a no-op, log=%s", logData)
+	}
+}
+
+func TestTryPushDisabledWithoutCacheEnv(t *testing.T) {
+	t.Setenv("SIMPLYBS_CACHE_TAG", "")
+	t.Setenv("SIMPLYBS_CACHE_REPO", "")
+	// Must not panic / call gh when disabled.
+	TryPushPackageCache(&Package{Package: "zlib", Version: "1.0"}, host.SupportedHosts["x86_64-linux-gnu"])
+}
+
 func TestCollectNeededPackagesIncludesDeps(t *testing.T) {
 	chdirRepoRoot(t)
 	pkg, err := FindPackage("zlib")

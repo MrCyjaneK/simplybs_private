@@ -119,8 +119,19 @@ func buildForHost(host *host.Host, packageNames []*pack.Package, list bool, extr
 	}
 
 	if build {
+		if pack.CacheEnabled() {
+			log.Printf("cache: enabled (tag=%s repo=%s); auto pull/push", pack.CacheTag(), pack.CacheRepo())
+			if err := pack.CachePull(packageNames, host); err != nil {
+				log.Printf("cache: auto-pull failed: %v", err)
+			}
+		}
 		for _, pkg := range packageNames {
 			pkg.EnsureBuilt(host, true)
+		}
+		if pack.CacheEnabled() {
+			if err := pack.CachePush(packageNames, host); err != nil {
+				log.Printf("cache: auto-push failed: %v", err)
+			}
 		}
 	}
 	if extract {
