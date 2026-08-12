@@ -49,7 +49,8 @@ configure_docker() {
 }
 
 if install_docker && configure_docker; then
-  echo "==> docker ready: $(docker --version)"
+  echo "==> docker installed: $(docker --version)"
+  echo "==> to start the daemon: sudo bash -c 'nohup dockerd >/var/log/dockerd.log 2>&1 &'"
 else
   echo "==> WARNING: docker setup failed; continuing without docker" >&2
 fi
