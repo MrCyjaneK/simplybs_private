@@ -56,7 +56,6 @@ already fail on a clean checkout — unrelated to environment setup.
 
 `go` and `gh` are provided by the base image; there is nothing else to install.
 
-<<<<<<< HEAD
 ## Cache environment variables
 
 `install.sh` exports the shared cache settings box-wide (via `/etc/environment`
@@ -64,18 +63,12 @@ and `/etc/profile.d/simplybs-cache.sh`), so every command sees them:
 
 - `SIMPLYBS_CACHE_TAG=v0-sbs-<user>-<goos>-<goarch>` (e.g. `v0-sbs-ubuntu-linux-amd64`)
 - `SIMPLYBS_CACHE_REPO=mrcyjanek/simplybs_private`
-=======
-## Build cache
 
-GitHub Release cache for built archives (see README). Requires both
-`SIMPLYBS_CACHE_TAG` and `SIMPLYBS_CACHE_REPO`; when set, cache is enabled and
-`-build` auto-pulls needed artifacts and auto-pushes new/changed ones.
+When both are set, cache is enabled: `-build` auto-pulls needed artifacts and
+auto-pushes new/changed ones (see README). Explicit flags:
 
 ```bash
-export SIMPLYBS_CACHE_TAG=v0-sbs-$USER-$(go env GOOS)-$(go env GOARCH)
-export SIMPLYBS_CACHE_REPO=owner/repo
-go run . -host x86_64-linux-gnu -package zlib -build          # auto pull + push
-go run . -host x86_64-linux-gnu -package zlib -cache-pull     # explicit
+go run . -host x86_64-linux-gnu -package zlib -cache-pull
+go run . -host x86_64-linux-gnu -package zlib -build
 go run . -host x86_64-linux-gnu -package zlib -cache-push
 ```
->>>>>>> 2773f51 (Add selective GitHub Release build cache pull/push)
