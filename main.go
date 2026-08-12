@@ -27,8 +27,8 @@ func main() {
 	argVersion := flag.Bool("v", false, "Show version")
 	argShell := flag.Bool("shell", false, "Extract source and start shell with build environment")
 	argCleanup := flag.Bool("cleanup", false, "Remove everything except current built archives")
-	argCachePull := flag.Bool("cache-pull", false, "Download needed build-cache artifacts from the GitHub release (SIMPLYBS_CACHE_TAG)")
-	argCachePush := flag.Bool("cache-push", false, "Upload new/changed local build-cache artifacts to the GitHub release")
+	argCachePull := flag.Bool("cache-pull", false, "Download needed build-cache artifacts (requires SIMPLYBS_CACHE_TAG and SIMPLYBS_CACHE_REPO)")
+	argCachePush := flag.Bool("cache-push", false, "Upload new/changed local build-cache artifacts (requires SIMPLYBS_CACHE_TAG and SIMPLYBS_CACHE_REPO)")
 	// argQuiet := flag.Bool("quiet", false, "Redirect stdout and stderr to /dev/null")
 	flag.Parse()
 	if *argVersion {

@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"testing"
 
@@ -60,20 +59,46 @@ func containsPlus(s string) bool {
 	return false
 }
 
-func TestCacheTagDefault(t *testing.T) {
+func TestCacheEnabledRequiresTagAndRepo(t *testing.T) {
 	t.Setenv("SIMPLYBS_CACHE_TAG", "")
-	t.Setenv("USER", "alice")
-	t.Setenv("USERNAME", "")
-	want := "v0-sbs-alice-" + runtime.GOOS + "-" + runtime.GOARCH
-	if got := CacheTag(); got != want {
-		t.Fatalf("CacheTag()=%q want %q", got, want)
+	t.Setenv("SIMPLYBS_CACHE_REPO", "")
+	if CacheEnabled() {
+		t.Fatal("expected cache disabled with neither set")
+	}
+	t.Setenv("SIMPLYBS_CACHE_TAG", "v0-sbs-test")
+	if CacheEnabled() {
+		t.Fatal("expected cache disabled with only TAG set")
+	}
+	t.Setenv("SIMPLYBS_CACHE_TAG", "")
+	t.Setenv("SIMPLYBS_CACHE_REPO", "owner/repo")
+	if CacheEnabled() {
+		t.Fatal("expected cache disabled with only REPO set")
+	}
+	t.Setenv("SIMPLYBS_CACHE_TAG", "v0-sbs-test")
+	t.Setenv("SIMPLYBS_CACHE_REPO", "owner/repo")
+	if !CacheEnabled() {
+		t.Fatal("expected cache enabled when both set")
+	}
+	if CacheTag() != "v0-sbs-test" || CacheRepo() != "owner/repo" {
+		t.Fatalf("CacheTag/CacheRepo = %q / %q", CacheTag(), CacheRepo())
 	}
 }
 
-func TestCacheTagOverride(t *testing.T) {
-	t.Setenv("SIMPLYBS_CACHE_TAG", "v0-sbs-shared-linux-amd64")
-	if got := CacheTag(); got != "v0-sbs-shared-linux-amd64" {
-		t.Fatalf("CacheTag()=%q", got)
+func TestRequireCacheConfig(t *testing.T) {
+	t.Setenv("SIMPLYBS_CACHE_TAG", "")
+	t.Setenv("SIMPLYBS_CACHE_REPO", "owner/repo")
+	if _, _, err := requireCacheConfig(); err == nil {
+		t.Fatal("expected error when TAG missing")
+	}
+	t.Setenv("SIMPLYBS_CACHE_TAG", "v0-sbs-test")
+	t.Setenv("SIMPLYBS_CACHE_REPO", "")
+	if _, _, err := requireCacheConfig(); err == nil {
+		t.Fatal("expected error when REPO missing")
+	}
+	t.Setenv("SIMPLYBS_CACHE_REPO", "owner/repo")
+	tag, repo, err := requireCacheConfig()
+	if err != nil || tag != "v0-sbs-test" || repo != "owner/repo" {
+		t.Fatalf("got tag=%q repo=%q err=%v", tag, repo, err)
 	}
 }
 
@@ -142,6 +167,7 @@ func TestCachePullDownloadsOnlyNeededAssets(t *testing.T) {
 	dataDir := t.TempDir()
 	t.Setenv("SIMPLYBS_DATA_DIR", dataDir)
 	t.Setenv("SIMPLYBS_CACHE_TAG", "v0-sbs-test-linux-amd64")
+	t.Setenv("SIMPLYBS_CACHE_REPO", "owner/simplybs-cache")
 
 	pkg, err := FindPackage("zlib")
 	if err != nil {

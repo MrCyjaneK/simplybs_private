@@ -8,7 +8,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
 	"strings"
 	"sync"
 
@@ -24,6 +23,9 @@ import (
 // Pull only requests assets for the packages needed by the current build
 // (by short-hash filename). Push only uploads local files that are missing
 // from the release (content changes produce a new short-hash name).
+//
+// Cache is enabled only when both SIMPLYBS_CACHE_TAG and SIMPLYBS_CACHE_REPO
+// are set; EnsureBuilt then auto-pulls missing artifacts.
 
 const cacheAssetSuffixes = 3 // .info.txt, .tar.gz, _native.tar.gz
 
@@ -33,21 +35,29 @@ var (
 	remoteAssetsErr  error
 )
 
-// CacheTag returns the GitHub release tag used for the build cache.
-// Override with SIMPLYBS_CACHE_TAG; otherwise defaults to
-// v0-sbs-$USER-$GOOS-$GOARCH when USER is set.
+// CacheTag returns SIMPLYBS_CACHE_TAG (empty if unset).
 func CacheTag() string {
-	if tag := os.Getenv("SIMPLYBS_CACHE_TAG"); tag != "" {
-		return tag
+	return os.Getenv("SIMPLYBS_CACHE_TAG")
+}
+
+// CacheRepo returns SIMPLYBS_CACHE_REPO (owner/repo; empty if unset).
+func CacheRepo() string {
+	return os.Getenv("SIMPLYBS_CACHE_REPO")
+}
+
+// CacheEnabled reports whether remote build cache is configured.
+// Both SIMPLYBS_CACHE_TAG and SIMPLYBS_CACHE_REPO must be set.
+func CacheEnabled() bool {
+	return CacheTag() != "" && CacheRepo() != ""
+}
+
+func requireCacheConfig() (tag, repo string, err error) {
+	tag = CacheTag()
+	repo = CacheRepo()
+	if tag == "" || repo == "" {
+		return "", "", fmt.Errorf("cache: set both SIMPLYBS_CACHE_TAG and SIMPLYBS_CACHE_REPO")
 	}
-	user := os.Getenv("USER")
-	if user == "" {
-		user = os.Getenv("USERNAME")
-	}
-	if user == "" {
-		return ""
-	}
-	return fmt.Sprintf("v0-sbs-%s-%s-%s", user, runtime.GOOS, runtime.GOARCH)
+	return tag, repo, nil
 }
 
 func ghCmd(args ...string) *exec.Cmd {
@@ -55,11 +65,11 @@ func ghCmd(args ...string) *exec.Cmd {
 	if bin == "" {
 		bin = "gh"
 	}
-	cmd := exec.Command(bin, args...)
-	if repo := os.Getenv("SIMPLYBS_CACHE_REPO"); repo != "" {
-		cmd.Args = append([]string{bin, "-R", repo}, args...)
+	repo := CacheRepo()
+	if repo == "" {
+		return exec.Command(bin, args...)
 	}
-	return cmd
+	return exec.Command(bin, append([]string{"-R", repo}, args...)...)
 }
 
 // AssetNameForRel converts a path relative to DataDir()/built into a flat
@@ -248,10 +258,10 @@ func copyFile(src, dst string) error {
 // the GitHub release cache. Returns true when a complete local cache is present
 // afterwards (either already was, or was fetched).
 func TryPullPackageCache(p *Package, h *host.Host) bool {
-	tag := CacheTag()
-	if tag == "" {
+	if !CacheEnabled() {
 		return false
 	}
+	tag := CacheTag()
 	assets, err := loadRemoteAssets(tag)
 	if err != nil {
 		log.Printf("cache: failed to list release assets: %v", err)
@@ -280,9 +290,9 @@ func TryPullPackageCache(p *Package, h *host.Host) bool {
 
 // CachePull downloads only the built artifacts needed for pkgs on host h.
 func CachePull(pkgs []*Package, h *host.Host) error {
-	tag := CacheTag()
-	if tag == "" {
-		return fmt.Errorf("cache: set SIMPLYBS_CACHE_TAG (or USER for default v0-sbs-$USER-$GOOS-$GOARCH)")
+	tag, _, err := requireCacheConfig()
+	if err != nil {
+		return err
 	}
 	assets, err := loadRemoteAssets(tag)
 	if err != nil {
@@ -320,9 +330,9 @@ func CachePull(pkgs []*Package, h *host.Host) error {
 // When pkgs is non-empty, only artifacts for those packages (and their deps)
 // on host h are considered; otherwise every file under DataDir()/built is.
 func CachePush(pkgs []*Package, h *host.Host) error {
-	tag := CacheTag()
-	if tag == "" {
-		return fmt.Errorf("cache: set SIMPLYBS_CACHE_TAG (or USER for default v0-sbs-$USER-$GOOS-$GOARCH)")
+	tag, _, err := requireCacheConfig()
+	if err != nil {
+		return err
 	}
 	if err := ensureRelease(tag); err != nil {
 		return fmt.Errorf("cache: ensure release: %w", err)
