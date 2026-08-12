@@ -54,8 +54,4 @@ already fail on a clean checkout — unrelated to environment setup.
 
 ## Tooling
 
-- `go` and `gh` are provided by the base image.
-- `docker` is installed but not started automatically. Start it on demand:
-  ```bash
-  sudo bash -c 'nohup dockerd >/var/log/dockerd.log 2>&1 &'
-  ```
+`go` and `gh` are provided by the base image; there is nothing else to install.
