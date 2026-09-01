@@ -33,4 +33,5 @@ ENV GOCACHE=/tmp/go-cache \
     GOTMPDIR=/tmp/go-tmp
 
 USER 1001
+RUN mkdir -p /tmp/go-cache /tmp/go-modcache /tmp/go-tmp
 WORKDIR /workspace
