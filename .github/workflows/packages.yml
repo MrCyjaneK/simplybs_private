@@ -134,6 +134,7 @@ jobs:
     uses: ./.github/workflows/package-batch.yml
     secrets: inherit
     with:
+      runner: puzl-ubuntu-latest
       image: ${{ needs.image.outputs.image }}
       sha: ${{ needs.image.outputs.sha }}
       base: ${{ needs.image.outputs.base }}
@@ -148,6 +149,7 @@ jobs:
     uses: ./.github/workflows/package-batch.yml
     secrets: inherit
     with:
+      runner: puzl-ubuntu-latest
       image: ${{ needs.image.outputs.image }}
       sha: ${{ needs.image.outputs.sha }}
       base: ${{ needs.image.outputs.base }}
@@ -162,6 +164,7 @@ jobs:
     uses: ./.github/workflows/package-batch.yml
     secrets: inherit
     with:
+      runner: puzl-ubuntu-latest
       image: ${{ needs.image.outputs.image }}
       sha: ${{ needs.image.outputs.sha }}
       base: ${{ needs.image.outputs.base }}
