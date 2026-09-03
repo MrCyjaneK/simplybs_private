@@ -411,6 +411,7 @@
             "*:*:cd third_party/boringssl && python3 src/util/generate_build_files.py gn",
             "*:*:sed -i.bak -e 's/crypto_sources_mac_x86_64/crypto_sources_asm/g' -e 's/crypto_sources_linux_x86_64/crypto_sources_asm/g' -e 's/crypto_sources_linux_aarch64/crypto_sources_asm/g' -e 's/crypto_sources_mac_x86/crypto_sources_asm/g' -e 's/crypto_sources_linux_x86/crypto_sources_asm/g' -e 's/crypto_sources_linux_arm/crypto_sources_asm/g' ./third_party/boringssl/BUILD.gn",
             "*:*:sed -i.bak 's/-std=c++14/-std=c++17/g' ./third_party/boringssl/BUILD.gn",
+            "darwin_*:*:printf 'print(\"%s\")\\nprint(\"26.1\")\\n' \"$NATIVEPREFIX/_/SDK/MacOSX26.1.sdk\" > build/mac/find_sdk.py",
             "*:*:python3 ./tools/build.py --mode=product create_sdk",
             "*:*:mkdir -p $STAGING_DIR$NATIVEPREFIX",
             "*:*:cp -a $(find out -name dart-sdk -type d)/bin $STAGING_DIR$NATIVEPREFIX/",

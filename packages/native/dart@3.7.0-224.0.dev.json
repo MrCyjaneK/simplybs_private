@@ -434,6 +434,7 @@
             "*:*:echo 'no devtools :(' > third_party/devtools/web/index.html",
             "*:*:cd third_party/boringssl && python3 src/util/generate_build_files.py gn",
             "*:*:sed -i.bak 's/-std=c++14/-std=c++17/g' ./third_party/boringssl/BUILD.gn",
+            "darwin_*:*:printf 'print(\"%s\")\\nprint(\"26.1\")\\n' \"$NATIVEPREFIX/_/SDK/MacOSX26.1.sdk\" > build/mac/find_sdk.py",
             "*:*:python3 ./tools/build.py --mode=product create_sdk",
             "*:*:mkdir -p $STAGING_DIR$NATIVEPREFIX",
             "*:*:cp -a $(find out -name dart-sdk -type d)/bin $STAGING_DIR$NATIVEPREFIX/",
